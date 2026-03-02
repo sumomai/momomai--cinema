@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#8b0000">
+<link rel="apple-touch-icon" href="icon.png">
+<meta charset="UTF-8">
+<title>作品まとめ🎥</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=Zen+Maru+Gothic:wght@700&display=swap" rel="stylesheet">
+
+<style>
+body{
+  font-family: 'Noto Sans JP', sans-serif;
+  background: linear-gradient(180deg,#4a4a4a,#5c5c5c);
+  color:#f8f8f8;
+  padding:20px;
+  position:relative;
+}
+
+/* カーテン */
+body::before{
+  content:"";
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:180px;
+  background: repeating-linear-gradient(
+    90deg,
+    #8b0000 0px,
+    #8b0000 40px,
+    #a00000 40px,
+    #a00000 80px
+  );
+  opacity:0.85;
+  z-index:-1;
+}
+
+h1{
+  text-align:center;
+  font-family: 'Zen Maru Gothic', sans-serif;
+  font-size:38px;
+  letter-spacing:3px;
+  color:#ffd700;
+  text-shadow:
+    0 0 8px rgba(255,215,0,0.7),
+    0 0 20px rgba(255,182,193,0.6);
+  margin-top:100px;
+  margin-bottom:30px;
+}
+
+.card{
+  background:#fdf6e3;
+  color:#222;
+  padding:20px;
+  border-radius:12px;
+  margin-bottom:20px;
+  position:relative;
+  border:2px dashed #d4af37;
+  box-shadow:0 5px 15px rgba(0,0,0,0.4);
+}
+
+.card::before,
+.card::after{
+  content:"";
+  position:absolute;
+  width:20px;
+  height:20px;
+  background:#5c5c5c;
+  border-radius:50%;
+  top:50%;
+  transform:translateY(-50%);
+}
+.card::before{ left:-10px; }
+.card::after{ right:-10px; }
+
+.watching-card{
+  background:#fff5f5;
+  border:2px solid #d9534f;
+  box-shadow:0 0 15px rgba(217,83,79,0.4);
+}
+
+.now-label{
+  position:absolute;
+  top:-12px;
+  left:20px;
+  background:#d9534f;
+  color:white;
+  padding:4px 12px;
+  font-size:12px;
+  font-weight:bold;
+  border-radius:20px;
+  letter-spacing:1px;
+  box-shadow:0 3px 8px rgba(0,0,0,0.3);
+}
+
+input, select, textarea{
+  width:100%;
+  margin-bottom:10px;
+  padding:8px;
+  border-radius:8px;
+  border:1px solid #ccc;
+}
+
+button{
+  background:#d4af37;
+  color:black;
+  border:none;
+  padding:10px;
+  border-radius:6px;
+  width:100%;
+  font-size:16px;
+  cursor:pointer;
+  font-weight:bold;
+  margin-top:5px;
+}
+
+.deleteBtn{
+  background:#aaa;
+  color:white;
+}
+
+.stars{
+  font-size:28px;
+  margin-bottom:10px;
+}
+.star{
+  cursor:pointer;
+  color:#ccc;
+}
+.star.active{
+  color:#d4af37;
+}
+
+.progress{
+  font-size:14px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>🎥 作品まとめ 🍿</h1>
+
+<div class="card">
+<input id="title" placeholder="タイトル">
+
+<select id="type">
+  <option>ドラマ</option>
+  <option>映画</option>
+</select>
+
+<label>全話数</label>
+<input id="total" type="number">
+
+<label>何話</label>
+<input id="current" type="number">
+
+<label>
+  現在視聴中 👀✨  
+<input type="checkbox" id="watching">
+</label>
+
+<div class="stars">
+  <span class="star" onclick="setRating(1)">★</span>
+  <span class="star" onclick="setRating(2)">★</span>
+  <span class="star" onclick="setRating(3)">★</span>
+  <span class="star" onclick="setRating(4)">★</span>
+  <span class="star" onclick="setRating(5)">★</span>
+</div>
+
+<input id="date" type="date">
+<textarea id="memo" placeholder="感想"></textarea>
+
+<button onclick="save()">保存する</button>
+</div>
+
+<h2 style="color:#ffd700;">🎬 とちゅう</h2>
+<div id="nowShowing"></div>
+
+<h2>📖 りれき</h2>
+<div id="list"></div>
+
+<script>
+let logs = JSON.parse(localStorage.getItem("logs")) || [];
+let currentRating = 0;
+let editIndex = -1;
+
+function setRating(rating){
+  currentRating = rating;
+  document.querySelectorAll(".star").forEach((star,index)=>{
+    star.classList.toggle("active", index < rating);
+  });
+}
+
+function save(){
+  const totalNum = parseInt(total.value) || 0;
+  const currentNum = parseInt(current.value) || 0;
+  const progress = totalNum > 0 ? Math.round((currentNum/totalNum)*100) : 100;
+
+  const log = {
+    title: title.value,
+    type: type.value,
+    total: totalNum,
+    current: currentNum,
+    progress: progress,
+    rating: currentRating,
+    date: date.value,
+    memo: memo.value,
+    watching: watching.checked
+  };
+
+  if(editIndex === -1){
+    logs.push(log);
+  } else {
+    logs[editIndex] = log;
+    editIndex = -1;
+  }
+
+  localStorage.setItem("logs", JSON.stringify(logs));
+  clearForm();
+  render();
+}
+
+function editLog(index){
+  const log = logs[index];
+  title.value = log.title;
+  type.value = log.type;
+  total.value = log.total;
+  current.value = log.current;
+  date.value = log.date;
+  memo.value = log.memo;
+  watching.checked = log.watching;
+  setRating(log.rating);
+  editIndex = index;
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function deleteLog(index){
+  if(confirm("削除する？")){
+    logs.splice(index,1);
+    localStorage.setItem("logs", JSON.stringify(logs));
+    render();
+  }
+}
+
+function clearForm(){
+  title.value="";
+  total.value="";
+  current.value="";
+  date.value="";
+  memo.value="";
+  watching.checked=false;
+  currentRating=0;
+  document.querySelectorAll(".star").forEach(s=>s.classList.remove("active"));
+}
+
+function render(){
+  list.innerHTML="";
+  nowShowing.innerHTML="";
+
+  logs.forEach((log,index)=>{
+    const cardHTML = `
+    <div class="card ${log.watching ? 'watching-card' : ''}">
+      ${log.watching ? '<div class="now-label"> NOW WATCHING‼ </div>' : ''}
+      <strong>${log.title}</strong><br>
+      ${log.type} / ★${log.rating} / ${log.date}<br>
+      ${log.type==="ドラマ" ? `<div class="progress">進捗：${log.current}/${log.total}話 (${log.progress}%)</div>` : ""}
+      <p>${log.memo}</p>
+      <button onclick="editLog(${index})">編集</button>
+      <button class="deleteBtn" onclick="deleteLog(${index})">削除</button>
+    </div>`;
+
+    if(log.watching){
+      nowShowing.innerHTML += cardHTML;
+    } else {
+      list.innerHTML += cardHTML;
+    }
+  });
+}
+
+render();
+</script>
+
+</body>
+</html>
