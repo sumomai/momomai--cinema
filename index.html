@@ -142,12 +142,11 @@ border-radius:10px;
 margin-bottom:10px;
 }
 
-.title{
-  font-size:20px;
-  font-weight:bold;
-  display:block;
-  margin-bottom:5px;
-  line-height:1.3;
+.title{ font-size:20px; 
+ font-weight:bold; 
+ display:block; 
+ margin-bottom:5px; 
+ line-height:1.3;
 }
 
 #search{
@@ -207,8 +206,8 @@ margin-bottom:5px;
 }
 
 #list{
-display:flex;
-flex-direction:column;
+display:grid;
+grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
 gap:15px;
 }
 
@@ -253,6 +252,18 @@ margin:3px 0;
 font-size:14px;
 }
 
+.card{
+width:100%;
+box-sizing:border-box;
+}
+
+#list{
+display:grid;
+grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+gap:15px;
+}
+
+
 </style>
 </head>
 
@@ -287,7 +298,10 @@ font-size:14px;
 
 <select id="type">
 <option>ドラマ</option>
+<option>アニメ</option>
 <option>映画</option>
+<option>映画(映画館)</option>
+
 </select>
 
 <label>全話数</label>
@@ -414,7 +428,7 @@ title:title.value,
 type:type.value,
 total:Number(total.value)||0,
 current:Number(current.value)||0,
-rating:currentRating,
+rating:Number(currentRating),
 date:date.value,
 memo:memo.value,
 watching:watching.checked,
@@ -521,11 +535,19 @@ ${log.poster?`<img src="${log.poster}" style="width:80px;border-radius:6px;">`:"
 
 <div>${log.title}</div>
 
-★${log.rating}
+${log.watching && log.type==="ドラマ"
+? `📺 ${log.current}/${log.total}話`
+: `★${log.rating}`}
+
 
 <br>
 
+<button onclick="event.stopPropagation();nextEpisode(${i})">▶ 次の話</button>
+
+<button onclick="event.stopPropagation();finish(${i})">✔ 見終わった</button>
+
 <button onclick="event.stopPropagation();editLog(${i})">編集</button>
+
 <button class="deleteBtn" onclick="event.stopPropagation();deleteLog(${i})">削除</button>
 
 </div>
@@ -561,7 +583,7 @@ ${log.poster?`<img src="${log.poster}" style="width:90px;border-radius:8px;margi
 
 ${log.genre?`<div>🎭 ${log.genre}</div>`:""}
 
-${log.type==="ドラマ"
+${log.type==="ドラマ" || log.type==="アニメ"
 ?`<div class="progress">進捗 ${log.current}/${log.total}話 (${progress}%)</div>`
 :""}
 
@@ -569,7 +591,11 @@ ${log.type==="ドラマ"
 
 <br>
 
-${log.date?`📅 ${log.date}`:""}
+${log.date
+? (log.type==="映画(映画館)"
+    ? `🍿 鑑賞日 ${log.date}`
+    : `📅 ${log.date}`)
+: ""}
 
 <br>
 
@@ -627,7 +653,7 @@ ${log.poster?`<img src="${log.poster}">`:""}
 
 <p>${log.type}</p>
 
-<p>★${"★".repeat(log.rating)}</p>
+<p>評価 ${"★".repeat(Number(log.rating) || 0)}</p>
 
 <p>📅 ${log.date||"-"}</p>
 
@@ -692,6 +718,39 @@ suggestions.appendChild(div);
 });
 
 render();
+
+function nextEpisode(i){
+
+logs[i].current++;
+
+if(logs[i].total && logs[i].current > logs[i].total){
+logs[i].current = logs[i].total;
+}
+
+logs[i].progress = logs[i].total
+? Math.round((logs[i].current / logs[i].total) * 100)
+: 100;
+
+localStorage.setItem("logs",JSON.stringify(logs));
+
+render();
+
+}
+
+function finish(i){
+
+logs[i].watching = false;
+
+if(logs[i].total){
+logs[i].current = logs[i].total;
+logs[i].progress = 100;
+}
+
+localStorage.setItem("logs",JSON.stringify(logs));
+
+render();
+
+}
 
 /* バックアップ */
 
