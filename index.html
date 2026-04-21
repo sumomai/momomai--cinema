@@ -300,9 +300,68 @@ grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
 gap:15px;
 }
 
+#imgViewer{
+  display:none;
+  align-items:center;
+  justify-content:center;
+  background:rgba(0,0,0,0.85);
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  z-index:2000;
+  animation:fadeIn 0.2s ease;
+}
+
+#bigImg{
+  animation:zoomIn 0.2s ease;
+}
+
+@keyframes fadeIn{
+  from{opacity:0;}
+  to{opacity:1;}
+}
+
+@keyframes zoomIn{
+  from{transform:scale(0.8);}
+  to{transform:scale(1);}
+}
+
+@media (max-width: 600px){
+
+  #list{
+    grid-template-columns:repeat(auto-fill,minmax(120px,1fr));
+    gap:10px;
+  }
+
+  .card{
+    padding:10px;
+    border-radius:10px;
+  }
+
+  .card img{
+    width:70px;
+  }
+
+  .title{
+    font-size:14px;
+  }
+
+  .progress{
+    font-size:12px;
+  }
+
+  button{
+    font-size:12px;
+    padding:6px;
+  }
+
+}
 
 </style>
 </head>
+
 
 <body>
 
@@ -363,6 +422,8 @@ gap:15px;
 <label>日付</label>
 <input id="date" type="date">
 
+主演
+<input id="cast" placeholder="主演（例：山田涼介、橋本環奈）">
 <textarea id="memo" placeholder="感想"></textarea>
 
 <button onclick="save()">保存する</button>
@@ -457,33 +518,37 @@ async function save(){
 
 if(!title.value) return alert("タイトル入力してね");
 
-const movie=await searchMovie(title.value);
+/* 編集中なら元データ */
+let base = editIndex !== null ? logs[editIndex] : {};
 
-const log={
+/* 新規だけAPI */
+let movie = {};
+if(editIndex === null){
+movie = await searchMovie(title.value);
+}
 
+let log={
 title:title.value,
 type:type.value,
-total:Number(total.value)||0,
-current:Number(current.value)||0,
-rating:Number(currentRating),
-date:date.value,
+total:total.value,
+current:current.value,
+rating:currentRating,
 memo:memo.value,
-watching:watching.checked,
-poster:movie.poster,
-genre:movie.genre
-
+poster: movie.poster || base.poster || "",
+genre: movie.genre || base.genre || "",
+cast: cast.value || base.cast || "",
+date: date.value,
+watching: watching.checked
 };
 
-if(editIndex!==null){
-
-logs[editIndex]=log;
-editIndex=null;
-
-}else{
-
-logs.push(log);
-
+/* 👇ここが神ポイント */
+if(editIndex !== null){
+logs.splice(editIndex,1); // 元の場所から削除
+editIndex = null;
 }
+
+/* 👇必ず左に追加 */
+logs.unshift(log);
 
 localStorage.setItem("logs",JSON.stringify(logs));
 
@@ -502,7 +567,7 @@ current.value="";
 date.value="";
 memo.value="";
 watching.checked=false;
-
+editIndex=null;
 currentRating=0;
 
 document.querySelectorAll(".star").forEach(s=>s.classList.remove("active"));
@@ -522,8 +587,9 @@ current.value=log.current;
 date.value=log.date;
 memo.value=log.memo;
 watching.checked=log.watching;
+cast.value=log.cast || "";
 
-setRating(log.rating);
+setRating(log.rating || 0);
 
 editIndex=i;
 
@@ -557,35 +623,33 @@ historyShelves.innerHTML="";
 /* 視聴中 */
 
 logs
-.filter(l=>l.title.toLowerCase().includes(keyword))
-.forEach((log,i)=>{
+.map((log,index)=>({log,index})) 
+.filter(x=>x.log.title.toLowerCase().includes(keyword))
+.forEach(({log,index})=>{
 
 if(log.watching){
-
-nowShowing.innerHTML+=`
-
-<div class="watchCard" onclick="showDetail(${i})">
+nowShowing.innerHTML += `
+<div class="watchCard" onclick="showDetail(${index})">
 
 <div class="watchLabel">NOW WATCHING</div>
 
-${log.poster?`<img src="${log.poster}" style="width:80px;border-radius:6px;">`:""}
+${log.poster ? `
+<img src="${log.poster}" style="width:80px;border-radius:6px;"
+onclick="event.stopPropagation();showImage('${log.poster}')">
+` : ""}
 
 <div>${log.title}</div>
 
-${log.watching && log.type==="ドラマ"
+${log.type==="ドラマ" || log.type==="アニメ"
 ? `📺 ${log.current}/${log.total}話`
 : `★${log.rating}`}
 
-
 <br>
 
-<button onclick="event.stopPropagation();nextEpisode(${i})">▶ 次の話</button>
-
-<button onclick="event.stopPropagation();finish(${i})">✔ 見終わった</button>
-
-<button onclick="event.stopPropagation();editLog(${i})">編集</button>
-
-<button class="deleteBtn" onclick="event.stopPropagation();deleteLog(${i})">削除</button>
+<button onclick="event.stopPropagation();nextEpisode(${index})">▶ 次の話</button>
+<button onclick="event.stopPropagation();finish(${index})">✔ 見終わった</button>
+<button onclick="event.stopPropagation();editLog(${index})">編集</button>
+<button class="deleteBtn" onclick="event.stopPropagation();deleteLog(${index})">削除</button>
 
 </div>
 `;
@@ -593,6 +657,9 @@ ${log.watching && log.type==="ドラマ"
 }
 
 });
+
+
+
 
 /* 履歴 */
 
@@ -610,19 +677,21 @@ const progress=log.total
 ?Math.floor(log.current/log.total*100)
 :0;
 
-shelfHTML+=`
-
+shelfHTML += `
 <div class="card" onclick="showDetail(${realIndex})">
 
-${log.poster?`<img src="${log.poster}" style="width:90px;border-radius:8px;margin-bottom:5px;">`:""}
+${log.poster ? `
+<img src="${log.poster}" style="width:90px;border-radius:8px;margin-bottom:5px;"
+onclick="event.stopPropagation();showImage('${log.poster}')">
+` : ""}
 
 <strong class="title">${log.title}</strong>
 
-${log.genre?`<div>🎭 ${log.genre}</div>`:""}
+${log.genre ? `<div>🎭 ${log.genre}</div>` : ""}
 
 ${log.type==="ドラマ" || log.type==="アニメ"
-?`<div class="progress">進捗 ${log.current}/${log.total}話 (${progress}%)</div>`
-:""}
+? `<div class="progress">進捗 ${log.current}/${log.total}話 (${progress}%)</div>`
+: ""}
 
 ★${log.rating}
 
@@ -683,6 +752,8 @@ function showDetail(i){
 const log=logs[i];
 
 popupContent.innerHTML=`
+
+${log.cast?`主演：${log.cast}<br>`:""}
 
 ${log.poster?`<img src="${log.poster}">`:""}
 
@@ -845,14 +916,68 @@ reader.readAsText(file);
 
 }
 
+let titleInput=document.getElementById("title");
+let totalInput=document.getElementById("total");
+titleInput.addEventListener("change",async()=>{
 
+if(type.value!=="ドラマ" && type.value!=="アニメ") return;
+
+let res=await fetch(`https://api.themoviedb.org/3/search/tv?api_key=${API_KEY}&query=${encodeURIComponent(titleInput.value)}&language=ja-JP`);
+
+let data=await res.json();
+
+if(data.results.length>0){
+
+let id=data.results[0].id;
+
+/* 総話数 */
+let detail=await fetch(`https://api.themoviedb.org/3/tv/${id}?api_key=${API_KEY}&language=ja-JP`);
+let d=await detail.json();
+totalInput.value=d.number_of_episodes;
+
+/* 主演 */
+let castText=await getCast(id, type.value);
+cast.value=castText;
+
+}
+
+});
+
+
+async function getCast(id, type){
+
+let url = type==="映画" || type==="映画(映画館)"
+? `https://api.themoviedb.org/3/movie/${id}/credits?api_key=${API_KEY}&language=ja-JP`
+: `https://api.themoviedb.org/3/tv/${id}/credits?api_key=${API_KEY}&language=ja-JP`;
+
+let res = await fetch(url);
+let data = await res.json();
+
+return data.cast.slice(0,5).map(c=>c.name).join("、");
+
+}
+
+function showImage(src){
+  bigImg.src = src;
+  imgViewer.style.display = "flex";
+}
+
+function closeImage(){
+  imgViewer.style.display = "none";
+}
 
 </script>
+
 <div id="overlay" class="overlay" onclick="closeDetail()">
   <div class="popup" onclick="event.stopPropagation()">
     <div id="popupContent"></div>
     <button onclick="closeDetail()">閉じる</button>
   </div>
 </div>
+
+<div id="imgViewer" class="overlay" onclick="closeImage()">
+  <img id="bigImg" style="max-width:90%; max-height:90%; border-radius:10px;">
+</div>
+
 </body>
 </html>
